@@ -19,11 +19,12 @@ html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 Geist,system-ui,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 .app{height:100vh;height:100dvh;display:grid;grid-template-rows:1fr 1fr}
 .top{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5vh;padding:10px 8px}
-.presets{display:flex;gap:10px}
-.presets button{font:500 clamp(16px,2.4vh,22px) Geist,sans-serif;min-height:44px;min-width:84px;padding:0 16px;border-radius:999px;border:2px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.presets{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;position:relative;z-index:2}
+.presets button{font:500 clamp(16px,2.4vh,22px) Geist,sans-serif;min-height:44px;min-width:84px;padding:0 16px;border-radius:999px;border:2px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;touch-action:manipulation}
+.presets button.rst{border-style:dashed}
 .presets button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .presets button:disabled{opacity:.35;cursor:default}
-.read{font-family:"Geist Mono",ui-monospace,monospace;font-weight:500;font-size:min(18vw,34vh);line-height:.9;letter-spacing:-.05em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.read{font-family:"Geist Mono",ui-monospace,monospace;font-weight:500;font-size:min(18vw,34vh);line-height:1;letter-spacing:-.05em;pointer-events:none;position:relative;z-index:1;font-variant-numeric:tabular-nums;white-space:nowrap}
 .ringing .read{color:var(--st);animation:blink 1s steps(2) infinite}
 @keyframes blink{50%{opacity:.25}}
 @media(prefers-reduced-motion:reduce){.ringing .read{animation:none}}
@@ -43,6 +44,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 Geist,system-u
       <button tabindex="-1" data-m="2" class="on">2 menit</button>
       <button tabindex="-1" data-m="3">3 menit</button>
       <button tabindex="-1" data-m="5">5 menit</button>
+      <button tabindex="-1" id="bReset" class="rst">Reset</button>
     </div>
     <div class="read" id="read">02:00.000</div>
   </section>
@@ -68,6 +70,7 @@ function render(){
   bStart.disabled = active;
   bStop.disabled = !active;
   presets.querySelectorAll('button').forEach(b => b.disabled = active);
+  $('bReset').disabled = active;
 }
 
 function tick(){
@@ -102,10 +105,19 @@ function stop(){
   else if (state==='ringing') { stopAlarm(); state='idle'; remain=total; render(); }
 }
 
-presets.addEventListener('click', e => {
+function choose(m){
+  if (state==='running' || state==='ringing') return;
+  presets.querySelectorAll('[data-m]').forEach(x=>x.classList.toggle('on', +x.dataset.m===m));
+  total = m*60000; remain = total; state='idle'; render();
+}
+function reset(){
+  if (state==='running' || state==='ringing') return;
+  cancelAnimationFrame(raf); remain = total; state='idle'; render();
+}
+presets.addEventListener('pointerdown', e => {
   const b=e.target.closest('button'); if(!b || b.disabled) return;
-  presets.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x===b));
-  total = +b.dataset.m*60000; remain = total; state='idle'; render();
+  e.preventDefault();
+  if (b.id==='bReset') reset(); else choose(+b.dataset.m);
 });
 // Halaman harus punya fokus agar tombol keyboard terbaca (penting bila dibuka di dalam frame)
 const grab = () => { try { window.focus(); } catch(e) {} if (document.activeElement && document.activeElement!==document.body) document.activeElement.blur(); };
@@ -119,6 +131,8 @@ const isStop = e => e.key==='Enter' || e.code==='Enter' || e.code==='NumpadEnter
 document.addEventListener('keydown', e => {
   if (isStart(e)) { e.preventDefault(); if(!e.repeat) start(); }
   else if (isStop(e)) { e.preventDefault(); if(!e.repeat) stop(); }
+  else if (e.key==='r' || e.key==='R' || e.code==='KeyR') { e.preventDefault(); reset(); }
+  else if (['2','3','5'].includes(e.key)) { e.preventDefault(); choose(+e.key); }
 }, true);
 document.addEventListener('keyup', e => { if (isStart(e) || isStop(e)) e.preventDefault(); }, true);
 document.addEventListener('keypress', e => { if (isStart(e) || isStop(e)) e.preventDefault(); }, true);
